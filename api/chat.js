@@ -1,7 +1,7 @@
-const ZHIPU_API_KEY = "ca36c85232584ebc9bf8bed9819690bb.NxlJmqnX2zpZjkJM";
-const ZHIPU_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
+// 替换为你的硅基流动API密钥
+const SILICONFLOW_API_KEY = "sk-itupvpjschbwggytjpmjsneagezizipaebeivccwcfwsiuzw";
+const SILICONFLOW_URL = "https://api.siliconflow.cn/v1/chat/completions";
 
-// 指数退避重试函数
 async function fetchWithRetry(url, options, maxRetries = 3) {
     let retries = 0;
     while (retries < maxRetries) {
@@ -9,11 +9,10 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
         if (response.status !== 429) return response;
         
         retries++;
-        const waitTime = Math.pow(2, retries) * 1000; // 1s → 2s → 4s
-        console.log(`收到429限流，等待${waitTime}ms后重试（第${retries}次）`);
+        const waitTime = Math.pow(2, retries) * 1000;
         await new Promise(resolve => setTimeout(resolve, waitTime));
     }
-    throw new Error("多次重试后仍被限流，请稍后再试");
+    throw new Error("请求被限流");
 }
 
 module.exports = async (req, res) => {
@@ -30,17 +29,17 @@ module.exports = async (req, res) => {
         const { messages } = JSON.parse(rawBody);
 
         if (!messages || !Array.isArray(messages) || messages.length === 0) {
-            return res.status(400).json({error:"messages必须是非空数组"});
+            return res.status(400).json({error:"messages不能为空"});
         }
 
-        const upstreamResp = await fetchWithRetry(ZHIPU_URL, {
+        const upstreamResp = await fetchWithRetry(SILICONFLOW_URL, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${ZHIPU_API_KEY.trim()}`
+                "Authorization": `Bearer ${SILICONFLOW_API_KEY.trim()}`
             },
             body: JSON.stringify({
-                model: "glm-4.7-flash",
+                model: "Qwen2.5-7B-Instruct", // 免费模型
                 messages: messages,
                 temperature: 0.7,
                 max_tokens: 2048
@@ -50,13 +49,13 @@ module.exports = async (req, res) => {
         const upstreamData = await upstreamResp.json();
         if (!upstreamResp.ok) {
             return res.status(upstreamResp.status).json({
-                tip: "智谱官方返回错误",
+                tip: "上游接口错误",
                 officialError: upstreamData
             });
         }
         res.status(200).json(upstreamData);
     } catch (err) {
-        console.error("后端完整报错：", err);
+        console.error("后端错误：", err);
         res.status(429).json({error:"请求被限流", detail: err.message});
     }
 };
