@@ -12,7 +12,7 @@
             padding:0 10px;
             font-family:system-ui, sans-serif;
             /* 背景图配置，自行替换链接 */
-            background: url("VRChat_2026-02-17_00-59-44.043_1920x1080.png") no-repeat center center;
+            background: url("https://picsum.photos/1920/1080") no-repeat center center;
             background-size: cover;
             background-attachment: fixed;
             min-height: 100vh;
@@ -108,6 +108,7 @@
 
         // 追加消息（支持文字+图片）
         function addMsg(text, imgSrc, isUser){
+            if (!chatBox) return;
             const div = document.createElement('div');
             div.className = isUser ? 'msg user' : 'msg ai';
             // 文字内容
@@ -123,42 +124,46 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        // 清空已选图片
+        // 清空已选图片（修复空指针错误）
         function clearImage(){
             currentImgBase64 = "";
-            previewBox.style.display = "none";
-            previewImg.src = "";
+            if (previewBox) previewBox.style.display = "none";
+            if (previewImg) previewImg.src = "";
+            if (fileInput) fileInput.value = "";
         }
 
         // 监听图片选择
-        fileInput.addEventListener('change', function(e){
-            const file = e.target.files[0];
-            if(!file) return;
-            // 限制图片大小：5MB
-            if(file.size > 5 * 1024 * 1024){
-                alert("图片不能超过5MB！");
-                fileInput.value = "";
-                return;
-            }
+        if (fileInput) {
+            fileInput.addEventListener('change', function(e){
+                const file = e.target.files[0];
+                if(!file) return;
+                // 限制图片大小：5MB
+                if(file.size > 5 * 1024 * 1024){
+                    alert("图片不能超过5MB！");
+                    fileInput.value = "";
+                    return;
+                }
 
-            const reader = new FileReader();
-            reader.onload = function(ev){
-                currentImgBase64 = ev.target.result;
-                // 显示预览
-                previewImg.src = currentImgBase64;
-                previewBox.style.display = "block";
-            };
-            reader.readAsDataURL(file);
-        });
+                const reader = new FileReader();
+                reader.onload = function(ev){
+                    currentImgBase64 = ev.target.result;
+                    // 显示预览
+                    if (previewImg) previewImg.src = currentImgBase64;
+                    if (previewBox) previewBox.style.display = "block";
+                };
+                reader.readAsDataURL(file);
+            });
+        }
 
         // 发送请求（兼容纯文字 / 图文）
         async function chat(text){
+            if (!sendBtn) return;
             sendBtn.disabled = true;
             const imgBase64 = currentImgBase64;
 
             // 前端展示消息
             addMsg(text, imgBase64, true);
-            input.value = "";
+            if (input) input.value = "";
             clearImage();
 
             try {
@@ -184,33 +189,41 @@
                     body: JSON.stringify({ messages })
                 });
 
+                if (!res.ok) {
+                    throw new Error(`接口错误: ${res.status}`);
+                }
+
                 const data = await res.json();
-                const reply = data.choices[0].message.content;
+                const reply = data.choices?.[0]?.message?.content || "AI没有返回有效回复";
                 addMsg(reply, "", false);
             } catch (err) {
                 addMsg("请求失败，请稍后重试", "", false);
-                console.error(err);
+                console.error("请求错误:", err);
             } finally {
                 sendBtn.disabled = false;
             }
         }
 
         // 点击发送
-        sendBtn.addEventListener('click', ()=>{
-            const txt = input.value.trim();
-            // 文字/图片 至少有一个才能发送
-            if(!txt && !currentImgBase64) return;
-            chat(txt);
-        });
-
-        // 回车发送
-        input.addEventListener('keydown', (e)=>{
-            if(e.key === 'Enter'){
-                const txt = input.value.trim();
+        if (sendBtn) {
+            sendBtn.addEventListener('click', ()=>{
+                const txt = input?.value?.trim() || "";
+                // 文字/图片 至少有一个才能发送
                 if(!txt && !currentImgBase64) return;
                 chat(txt);
-            }
-        });
+            });
+        }
+
+        // 回车发送
+        if (input) {
+            input.addEventListener('keydown', (e)=>{
+                if(e.key === 'Enter'){
+                    const txt = input?.value?.trim() || "";
+                    if(!txt && !currentImgBase64) return;
+                    chat(txt);
+                }
+            });
+        }
     </script>
 </body>
 </html>
