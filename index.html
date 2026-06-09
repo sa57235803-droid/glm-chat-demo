@@ -124,7 +124,7 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        // 清空已选图片（修复空指针错误）
+        // 清空已选图片
         function clearImage(){
             currentImgBase64 = "";
             if (previewBox) previewBox.style.display = "none";
@@ -167,15 +167,21 @@
             clearImage();
 
             try {
-                // 组装智谱多模态消息体
+                // 【关键修复1】严格按照智谱规范组装messages数组
                 let messages = [];
                 if(imgBase64){
-                    // 图文格式
+                    // 多模态图文格式（完全符合智谱API要求）
                     messages.push({
                         role: "user",
                         content: [
                             { type: "text", text: text || "请描述这张图片" },
-                            { type: "image_url", image_url: { url: imgBase64 } }
+                            { 
+                                type: "image_url", 
+                                image_url: { 
+                                    url: imgBase64, // 完整Base64，包含data:image/...前缀
+                                    detail: "auto"
+                                } 
+                            }
                         ]
                     });
                 } else {
@@ -183,14 +189,19 @@
                     messages.push({ role: "user", content: text });
                 }
 
+                // 【关键修复2】强制声明Content-Type为application/json
                 const res = await fetch(API_URL, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ messages })
+                    headers: {
+                        "Content-Type": "application/json; charset=utf-8"
+                    },
+                    body: JSON.stringify({ messages: messages })
                 });
 
                 if (!res.ok) {
-                    throw new Error(`接口错误: ${res.status}`);
+                    const errorData = await res.json();
+                    console.error("后端返回错误详情：", errorData);
+                    throw new Error(`接口错误: ${res.status} - ${errorData.error || errorData.tip || ""}`);
                 }
 
                 const data = await res.json();
