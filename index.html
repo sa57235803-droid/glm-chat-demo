@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GLM-4.7-Flash 对话</title>
+    <title>硅基流动 对话</title>
     <style>
         *{margin:0;padding:0;box-sizing:border-box;}
         body{
@@ -11,7 +11,7 @@
             margin:20px auto;
             padding:0 10px;
             font-family:system-ui, sans-serif;
-            background: url("VRChat_2026-02-17_00-59-44.043_1920x1080.png") no-repeat center center;
+            background: url("https://picsum.photos/1920/1080") no-repeat center center;
             background-size: cover;
             background-attachment: fixed;
             min-height: 100vh;
@@ -66,7 +66,7 @@
     </style>
 </head>
 <body>
-    <h2>Shorekeeper 图文对话</h2>
+    <h2>硅基流动 图文对话</h2>
     <div id="chat-box"></div>
 
     <div id="preview-box">
@@ -91,7 +91,7 @@
         const previewImg = document.getElementById('preview-img');
 
         let currentImgBase64 = "";
-        let isRequesting = false; // 标记是否正在请求
+        let isRequesting = false;
 
         function addMsg(text, imgSrc, isUser){
             if (!chatBox) return;
@@ -136,9 +136,8 @@
         }
 
         async function chat(text){
-            // 关键：请求中直接拦截新请求
             if (isRequesting) {
-                alert("请等待上一条请求完成后再发送！");
+                addMsg("⚠️ 正在处理上一条请求，请稍后再发", "", false);
                 return;
             }
             isRequesting = true;
@@ -153,6 +152,7 @@
 
             try {
                 let messages = [];
+                // 硅基流动多模态格式（移除了智谱的detail参数）
                 if(imgBase64){
                     messages.push({
                         role: "user",
@@ -161,8 +161,7 @@
                             { 
                                 type: "image_url", 
                                 image_url: { 
-                                    url: imgBase64,
-                                    detail: "auto"
+                                    url: imgBase64
                                 } 
                             }
                         ]
@@ -182,7 +181,7 @@
                 if (!res.ok) {
                     const errorData = await res.json();
                     console.error("后端返回错误详情：", errorData);
-                    throw new Error(`接口错误: ${res.status} - ${errorData.error || errorData.tip || ""}`);
+                    throw new Error(`接口错误: ${res.status} - ${errorData.message || errorData.tip || ""}`);
                 }
 
                 const data = await res.json();
