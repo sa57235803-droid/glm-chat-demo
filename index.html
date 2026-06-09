@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>硅基流动 对话</title>
+    <title>AI 在线对话</title>
     <style>
         *{margin:0;padding:0;box-sizing:border-box;}
         body{
@@ -16,9 +16,24 @@
             background-attachment: fixed;
             min-height: 100vh;
         }
-        h2{text-align:center;margin-bottom:20px;color:#fff; text-shadow: 0 0 4px #000;}
+        .header{
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            margin-bottom:20px;
+        }
+        h2{color:#fff; text-shadow: 0 0 4px #000;}
+        .clear-btn{
+            padding:8px 16px;
+            background:#dc3545;
+            color:#fff;
+            border:none;
+            border-radius:6px;
+            cursor:pointer;
+            font-size:14px;
+        }
         #chat-box{
-            height: 60vh;
+            height: 65vh;
             border:1px solid #e5e7eb;
             border-radius:10px;
             padding:15px;
@@ -26,58 +41,24 @@
             margin-bottom:15px;
             background: rgba(255,255,255,0.85);
         }
-        .msg{margin:10px 0;padding:12px;border-radius:8px;max-width:85%;line-height:1.5;}
+        .msg{margin:10px 0;padding:12px;border-radius:8px;max-width:85%;line-height:1.5;white-space:pre-wrap;}
         .user{background:#1677ff;color:#fff;margin-left:auto;}
         .ai{background:#ffffff;border:1px solid #eee;margin-right:auto;}
         .loading{color:#666;font-style:italic;}
-        .msg-img {
-            max-width: 200px;
-            border-radius: 6px;
-            margin-top: 8px;
-            display: block;
-        }
-        .input-area{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
-        #input{flex:1;padding:12px;border:1px solid #ddd;border-radius:8px;outline:none;font-size:14px;background:rgba(255,255,255,0.9);min-width: 200px;}
-        #send{padding:12px 20px;border:none;background:#1677ff;color:#fff;border-radius:8px;cursor:pointer;font-size:14px;}
+        .input-area{display:flex;gap:10px;align-items:center;}
+        #input{flex:1;padding:12px;border:1px solid #ddd;border-radius:8px;outline:none;font-size:14px;background:rgba(255,255,255,0.9);}
+        #send{padding:12px 24px;border:none;background:#1677ff;color:#fff;border-radius:8px;cursor:pointer;font-size:14px;}
         #send:disabled{background:#88a8e8;cursor:not-allowed;}
-        .upload-btn {
-            padding: 12px 16px;
-            background: #6c757d;
-            color: #fff;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        #file-input {display: none;}
-        #preview-box {
-            width: 100%;
-            margin: 10px 0;
-            padding: 10px;
-            background: rgba(255,255,255,0.8);
-            border-radius: 8px;
-            display: none;
-        }
-        #preview-img {
-            max-width: 150px;
-            max-height: 150px;
-            border-radius: 6px;
-        }
-        .remove-img {color: red;cursor: pointer;margin-left: 10px;}
     </style>
 </head>
 <body>
-    <h2>硅基流动 图文对话</h2>
-    <div id="chat-box"></div>
-
-    <div id="preview-box">
-        < img id="preview-img" alt="预览图">
-        <span class="remove-img" onclick="clearImage()">移除图片</span>
+    <div class="header">
+        <h2>AI 在线对话</h2>
+        <button class="clear-btn" onclick="clearHistory()">清空历史记录</button>
     </div>
-
+    <div id="chat-box"></div>
     <div class="input-area">
-        <label class="upload-btn" for="file-input">选择图片</label>
-        <input type="file" id="file-input" accept="image/*">
-        <input type="text" id="input" placeholder="输入文字，可搭配图片一起发送">
+        <input type="text" id="input" placeholder="输入问题，回车发送">
         <button id="send">发送</button>
     </div>
 
@@ -86,96 +67,79 @@
         const chatBox = document.getElementById('chat-box');
         const input = document.getElementById('input');
         const sendBtn = document.getElementById('send');
-        const fileInput = document.getElementById('file-input');
-        const previewBox = document.getElementById('preview-box');
-        const previewImg = document.getElementById('preview-img');
 
-        let currentImgBase64 = "";
+        // 历史记录数组，格式：[{role: "user", content: "xxx"}, {role: "assistant", content: "xxx"}]
+        let chatHistory = [];
         let isRequesting = false;
 
-        function addMsg(text, imgSrc, isUser){
+        // 页面加载时读取历史记录
+        window.addEventListener('load', () => {
+            const savedHistory = localStorage.getItem('chatHistory');
+            if (savedHistory) {
+                chatHistory = JSON.parse(savedHistory);
+                renderHistory();
+            }
+        });
+
+        // 渲染历史记录
+        function renderHistory() {
+            chatBox.innerHTML = "";
+            chatHistory.forEach(msg => {
+                addMsg(msg.content, msg.role === "user");
+            });
+        }
+
+        // 保存历史记录到本地
+        function saveHistory() {
+            localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+        }
+
+        // 清空历史记录
+        function clearHistory() {
+            if (confirm("确定要清空所有聊天记录吗？此操作不可恢复")) {
+                chatHistory = [];
+                localStorage.removeItem('chatHistory');
+                chatBox.innerHTML = "";
+            }
+        }
+
+        // 添加单条消息到界面
+        function addMsg(text, isUser){
             if (!chatBox) return;
             const div = document.createElement('div');
             div.className = isUser ? 'msg user' : 'msg ai';
-            if(text) div.innerText = text;
-            if(imgSrc){
-                const img = document.createElement('img');
-                img.src = imgSrc;
-                img.className = "msg-img";
-                div.appendChild(img);
-            }
+            div.innerText = text;
             chatBox.appendChild(div);
             chatBox.scrollTop = chatBox.scrollHeight;
             return div;
         }
 
-        function clearImage(){
-            currentImgBase64 = "";
-            if (previewBox) previewBox.style.display = "none";
-            if (previewImg) previewImg.src = "";
-            if (fileInput) fileInput.value = "";
-        }
-
-        if (fileInput) {
-            fileInput.addEventListener('change', function(e){
-                const file = e.target.files[0];
-                if(!file) return;
-                if(file.size > 5 * 1024 * 1024){
-                    alert("图片不能超过5MB！");
-                    fileInput.value = "";
-                    return;
-                }
-                const reader = new FileReader();
-                reader.onload = function(ev){
-                    currentImgBase64 = ev.target.result;
-                    if (previewImg) previewImg.src = currentImgBase64;
-                    if (previewBox) previewBox.style.display = "block";
-                };
-                reader.readAsDataURL(file);
-            });
-        }
-
+        // 发送对话请求
         async function chat(text){
             if (isRequesting) {
-                addMsg("⚠️ 正在处理上一条请求，请稍后再发", "", false);
+                addMsg("⚠️ 正在处理上一条请求，请稍后再发", false);
                 return;
             }
             isRequesting = true;
-            if (sendBtn) sendBtn.disabled = true;
+            sendBtn.disabled = true;
 
-            const imgBase64 = currentImgBase64;
-            addMsg(text, imgBase64, true);
-            if (input) input.value = "";
-            clearImage();
+            // 添加用户消息到历史和界面
+            const userMsg = { role: "user", content: text };
+            chatHistory.push(userMsg);
+            addMsg(text, true);
+            input.value = "";
 
-            const loadingMsg = addMsg("正在生成回复...", "", false);
+            const loadingMsg = addMsg("正在生成回复...", false);
 
             try {
-                let messages = [];
-                // 硅基流动多模态格式（移除了智谱的detail参数）
-                if(imgBase64){
-                    messages.push({
-                        role: "user",
-                        content: [
-                            { type: "text", text: text || "请描述这张图片" },
-                            { 
-                                type: "image_url", 
-                                image_url: { 
-                                    url: imgBase64
-                                } 
-                            }
-                        ]
-                    });
-                } else {
-                    messages.push({ role: "user", content: text });
-                }
-
                 const res = await fetch(API_URL, {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json; charset=utf-8"
                     },
-                    body: JSON.stringify({ messages: messages })
+                    body: JSON.stringify({ 
+                        messages: chatHistory // 发送完整历史记录，实现上下文对话
+                    })
                 });
 
                 if (!res.ok) {
@@ -186,35 +150,43 @@
 
                 const data = await res.json();
                 const reply = data.choices?.[0]?.message?.content || "AI没有返回有效回复";
-                if (loadingMsg) chatBox.removeChild(loadingMsg);
-                addMsg(reply, "", false);
+                
+                // 移除加载消息，添加AI回复到历史和界面
+                chatBox.removeChild(loadingMsg);
+                const aiMsg = { role: "assistant", content: reply };
+                chatHistory.push(aiMsg);
+                addMsg(reply, false);
+
+                // 保存历史记录
+                saveHistory();
+
             } catch (err) {
                 if (loadingMsg) chatBox.removeChild(loadingMsg);
-                addMsg(`请求失败：${err.message}`, "", false);
+                addMsg(`请求失败：${err.message}`, false);
                 console.error("请求错误:", err);
+                // 出错时回滚用户消息
+                chatHistory.pop();
             } finally {
                 isRequesting = false;
-                if (sendBtn) sendBtn.disabled = false;
+                sendBtn.disabled = false;
             }
         }
 
-        if (sendBtn) {
-            sendBtn.addEventListener('click', ()=>{
-                const txt = input?.value?.trim() || "";
-                if(!txt && !currentImgBase64) return;
-                chat(txt);
-            });
-        }
+        // 点击发送
+        sendBtn.addEventListener('click', ()=>{
+            const txt = input.value.trim();
+            if(!txt) return;
+            chat(txt);
+        });
 
-        if (input) {
-            input.addEventListener('keydown', (e)=>{
-                if(e.key === 'Enter'){
-                    const txt = input?.value?.trim() || "";
-                    if(!txt && !currentImgBase64) return;
-                    chat(txt);
-                }
-            });
-        }
+        // 回车发送
+        input.addEventListener('keydown', (e)=>{
+            if(e.key === 'Enter'){
+                const txt = input.value.trim();
+                if(!txt) return;
+                chat(txt);
+            }
+        });
     </script>
 </body>
 </html>
