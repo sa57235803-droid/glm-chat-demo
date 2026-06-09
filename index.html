@@ -11,7 +11,6 @@
             margin:20px auto;
             padding:0 10px;
             font-family:system-ui, sans-serif;
-            /* 背景图配置，自行替换链接 */
             background: url("https://picsum.photos/1920/1080") no-repeat center center;
             background-size: cover;
             background-attachment: fixed;
@@ -30,19 +29,17 @@
         .msg{margin:10px 0;padding:12px;border-radius:8px;max-width:85%;line-height:1.5;}
         .user{background:#1677ff;color:#fff;margin-left:auto;}
         .ai{background:#ffffff;border:1px solid #eee;margin-right:auto;}
-        /* 消息内图片样式 */
+        .loading{color:#666;font-style:italic;}
         .msg-img {
             max-width: 200px;
             border-radius: 6px;
             margin-top: 8px;
             display: block;
         }
-        /* 输入区域整体 */
         .input-area{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
         #input{flex:1;padding:12px;border:1px solid #ddd;border-radius:8px;outline:none;font-size:14px;background:rgba(255,255,255,0.9);min-width: 200px;}
         #send{padding:12px 20px;border:none;background:#1677ff;color:#fff;border-radius:8px;cursor:pointer;font-size:14px;}
         #send:disabled{background:#88a8e8;cursor:not-allowed;}
-        /* 图片上传按钮 */
         .upload-btn {
             padding: 12px 16px;
             background: #6c757d;
@@ -51,11 +48,7 @@
             cursor: pointer;
             font-size: 14px;
         }
-        /* 隐藏原生文件选择框 */
-        #file-input {
-            display: none;
-        }
-        /* 图片预览区域 */
+        #file-input {display: none;}
         #preview-box {
             width: 100%;
             margin: 10px 0;
@@ -69,24 +62,18 @@
             max-height: 150px;
             border-radius: 6px;
         }
-        .remove-img {
-            color: red;
-            cursor: pointer;
-            margin-left: 10px;
-        }
+        .remove-img {color: red;cursor: pointer;margin-left: 10px;}
     </style>
 </head>
 <body>
     <h2>GLM-4.7-Flash 图文对话</h2>
     <div id="chat-box"></div>
 
-    <!-- 图片预览区 -->
     <div id="preview-box">
         < img id="preview-img" alt="预览图">
         <span class="remove-img" onclick="clearImage()">移除图片</span>
     </div>
 
-    <!-- 输入+上传+发送区域 -->
     <div class="input-area">
         <label class="upload-btn" for="file-input">选择图片</label>
         <input type="file" id="file-input" accept="image/*">
@@ -103,17 +90,14 @@
         const previewBox = document.getElementById('preview-box');
         const previewImg = document.getElementById('preview-img');
 
-        // 存储当前选中图片的Base64
         let currentImgBase64 = "";
+        let isRequesting = false; // 标记是否正在请求
 
-        // 追加消息（支持文字+图片）
         function addMsg(text, imgSrc, isUser){
             if (!chatBox) return;
             const div = document.createElement('div');
             div.className = isUser ? 'msg user' : 'msg ai';
-            // 文字内容
             if(text) div.innerText = text;
-            // 图片内容
             if(imgSrc){
                 const img = document.createElement('img');
                 img.src = imgSrc;
@@ -122,9 +106,9 @@
             }
             chatBox.appendChild(div);
             chatBox.scrollTop = chatBox.scrollHeight;
+            return div;
         }
 
-        // 清空已选图片
         function clearImage(){
             currentImgBase64 = "";
             if (previewBox) previewBox.style.display = "none";
@@ -132,22 +116,18 @@
             if (fileInput) fileInput.value = "";
         }
 
-        // 监听图片选择
         if (fileInput) {
             fileInput.addEventListener('change', function(e){
                 const file = e.target.files[0];
                 if(!file) return;
-                // 限制图片大小：5MB
                 if(file.size > 5 * 1024 * 1024){
                     alert("图片不能超过5MB！");
                     fileInput.value = "";
                     return;
                 }
-
                 const reader = new FileReader();
                 reader.onload = function(ev){
                     currentImgBase64 = ev.target.result;
-                    // 显示预览
                     if (previewImg) previewImg.src = currentImgBase64;
                     if (previewBox) previewBox.style.display = "block";
                 };
@@ -155,22 +135,25 @@
             });
         }
 
-        // 发送请求（兼容纯文字 / 图文）
         async function chat(text){
-            if (!sendBtn) return;
-            sendBtn.disabled = true;
-            const imgBase64 = currentImgBase64;
+            // 关键：请求中直接拦截新请求
+            if (isRequesting) {
+                alert("请等待上一条请求完成后再发送！");
+                return;
+            }
+            isRequesting = true;
+            if (sendBtn) sendBtn.disabled = true;
 
-            // 前端展示消息
+            const imgBase64 = currentImgBase64;
             addMsg(text, imgBase64, true);
             if (input) input.value = "";
             clearImage();
 
+            const loadingMsg = addMsg("正在生成回复...", "", false);
+
             try {
-                // 【关键修复1】严格按照智谱规范组装messages数组
                 let messages = [];
                 if(imgBase64){
-                    // 多模态图文格式（完全符合智谱API要求）
                     messages.push({
                         role: "user",
                         content: [
@@ -178,18 +161,16 @@
                             { 
                                 type: "image_url", 
                                 image_url: { 
-                                    url: imgBase64, // 完整Base64，包含data:image/...前缀
+                                    url: imgBase64,
                                     detail: "auto"
                                 } 
                             }
                         ]
                     });
                 } else {
-                    // 纯文字格式
                     messages.push({ role: "user", content: text });
                 }
 
-                // 【关键修复2】强制声明Content-Type为application/json
                 const res = await fetch(API_URL, {
                     method: "POST",
                     headers: {
@@ -206,26 +187,26 @@
 
                 const data = await res.json();
                 const reply = data.choices?.[0]?.message?.content || "AI没有返回有效回复";
+                if (loadingMsg) chatBox.removeChild(loadingMsg);
                 addMsg(reply, "", false);
             } catch (err) {
-                addMsg("请求失败，请稍后重试", "", false);
+                if (loadingMsg) chatBox.removeChild(loadingMsg);
+                addMsg(`请求失败：${err.message}`, "", false);
                 console.error("请求错误:", err);
             } finally {
-                sendBtn.disabled = false;
+                isRequesting = false;
+                if (sendBtn) sendBtn.disabled = false;
             }
         }
 
-        // 点击发送
         if (sendBtn) {
             sendBtn.addEventListener('click', ()=>{
                 const txt = input?.value?.trim() || "";
-                // 文字/图片 至少有一个才能发送
                 if(!txt && !currentImgBase64) return;
                 chat(txt);
             });
         }
 
-        // 回车发送
         if (input) {
             input.addEventListener('keydown', (e)=>{
                 if(e.key === 'Enter'){
