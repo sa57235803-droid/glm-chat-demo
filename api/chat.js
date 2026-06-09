@@ -1,5 +1,5 @@
 // 替换为你的硅基流动API密钥
-const SILICONFLOW_API_KEY = "sk-itupvpjschbwggytjpmjsneagezizipaebeivccwcfwsiuzw";
+const SILICONFLOW_API_KEY = "sk-gxjduonwtygnnieynspicxhjhhazffvkniomcxkvrlbtowca";
 const SILICONFLOW_URL = "https://api.siliconflow.cn/v1/chat/completions";
 
 async function fetchWithRetry(url, options, maxRetries = 3) {
